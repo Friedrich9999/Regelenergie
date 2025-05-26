@@ -24,17 +24,6 @@ def get_token():
     return TOKEN
 
 def get_data(TOKEN, DATA, PRODUCT,START,END):
-    client_id = 'cm_app_ntp_id_013b932add9243438c9c58411faa5e6d'
-    secret = 'ntp_Eaxzj4SW7er1aeiXGsN8'
-    access_token_url = 'https://identity.netztransparenz.de/users/connect/token'
-
-    data = {"grant_type": "client_credentials"}
-
-    response = requests.post(access_token_url, data=data, auth=(client_id, secret))
-
-    print(response.json()["access_token"])
-
-    TOKEN = response.json()["access_token"]
 
     request_URL = "https://ds.netztransparenz.de/api/v1/data/{}/{}/{}/{}".format(DATA,PRODUCT,START,END)
     response = requests.get(request_URL, headers = {'Authorization': 'Bearer {}'.format(TOKEN)})
@@ -45,7 +34,7 @@ def get_data(TOKEN, DATA, PRODUCT,START,END):
 
 function parse_comma_float(s::AbstractString)
     # Replace the comma with a dot and parse as a Float64
-    return parse(Float64, replace(s, "," => "."))
+    return s == "N.A." ? 0.0 : parse(Float64, replace(s, "," => "."))
 end
 
 function parse_time(s::AbstractString)
@@ -59,6 +48,7 @@ end
 function load_data(token, data, product, start_time, end_time)
     # Call the Python function from Julia
     # get OAuth2.0 Token
+    print("loading data $data, from $start_time until $end_time")
 
     # get response
     response = pycall(py"get_data", String, token, data, product, start_time, end_time)
