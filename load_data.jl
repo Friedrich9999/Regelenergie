@@ -1,6 +1,5 @@
 using CSV
 using DataFrames
-using CairoMakie
 using Dates
 
 function parse_comma_float(s::AbstractString)
@@ -12,19 +11,27 @@ function parse_time(s::AbstractString)
     return Time(DateTime(s, "HH:MM"))
 end
 
-## Load and clean Data from csv data use api later
 function load_data(path::String)
-    df = CSV.read(path,delim =";", dateformat= "dd.mm.yyyy",DataFrame)
+    df = CSV.read(path, delim=";", dateformat="dd.mm.yyyy", DataFrame)
 
-    date = Array(df[:,1])
-    time = Array(df[:,3])
-    max_power = Array(df[:,10])
-    min_power = Array(df[:,15])
 
-    max_power = parse_comma_float.(max_power)
-    min_power = parse_comma_float.(min_power)
+    rename!(df, [:date, :time_zone, :time, :time_end, :unit, :max_power_50hz, :max_power_amprion, :max_power_tennet, :max_power_transnetBW, :max_power_deutschland, :min_power_50hz, :min_power_amprion, :min_power_tennet, :min_power_transnetBW, :min_power_deutschland])
+
+    drop = [:time_zone, :time_end, :unit]
+    select!(df, Not(drop))
+
+    time = Array(df[:, 2])
 
     time = parse_time.(time)
+    df[!, "time"] = time
+    header = names(df)
+
+    for i in range(3, 12)
+        n = Array(df[:, i])
+        h = header[i]
+        n = parse_comma_float.(n)
+        df[!, header[i]] = n
+    end
 
     start = 1
     while time[start] != Time(DateTime("00:00", "HH:MM"))
@@ -35,12 +42,10 @@ function load_data(path::String)
     while time[e] != Time(DateTime("23:45", "HH:MM"))
         e -= 1
     end
-    
-    date = date[start:e]
-    time = time[start:e]
-    max_power = max_power[start:e]
-    min_power = min_power[start:e]
-    
-    return date, time, max_power, min_power
 
+    print("genutzte werte von $start bis $e")
+
+    df = df[start:e, :]
+
+    return df
 end
