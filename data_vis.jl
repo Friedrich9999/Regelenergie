@@ -14,7 +14,7 @@ function data_vis_histogramm(date, time, max_power, min_power, fig, ax_x, ax_y)
     print(dt)
 end
 
-function data_vis_heatmap(date, time, max_power, min_power, fig, row, col)
+function data_vis_heatmap(x, y, max_power, min_power, fig, row, col)
 
     nr_of_rows = 24 * 4 # one row for each datapoint per day
 
@@ -32,7 +32,7 @@ function data_vis_heatmap(date, time, max_power, min_power, fig, row, col)
     return fig
 end
 
-function data_vis_linegraph(date, time, max_power, min_power, fig, row, col)
+function data_vis_linegraph(x, power, fig, row, col)
 
     pos_lin = max_power .- min_power
     dt = date .+ time
@@ -47,4 +47,21 @@ function data_vis_linegraph(date, time, max_power, min_power, fig, row, col)
     ax_1.xlabel = "Datum"
     lines!(ax_1, dt, pos_lin)
     return fig
+end
+
+function data_vis_day(x, y, fig, row, col, ax_1)
+    #ax_1 = Axis(fig[row, col])
+    ax_1.ylabel = "Leistung in MW"
+    ax_1.xlabel = "Tageszeit"
+
+    lines!(ax_1, x, y)
+    return fig, ax_1
+end
+
+function data_vis_year(x, y, fig, row, col, ax_1, label)
+    #ax_1 = Axis(fig[row, col])
+
+    # Plot using the transformed date format on the x-axis
+    lines!(ax_1, x, y, label=label)
+    return fig, ax_1
 end
