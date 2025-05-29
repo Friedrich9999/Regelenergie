@@ -7,16 +7,18 @@ include("modify_data.jl")
 years = ["2022", "2023", "2024", "2025"]
 days = ["01-01", "04-01", "06-01", "10-01"]
 regions = ["50hz", "amprion", "tennet", "transnetBW", "deutschland"]
+leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
 
-
-for i in regions
-    if !isdir("grafiken/Sekundärregelleistung/$i")
+for leistungsart in leistungsarten
+    if !isdir("grafiken/$leistungsart")
         # Create the directory
-        mkdir("grafiken/Sekundärregelleistung/$i")
+        mkdir("grafiken/$leistungsart")
     end
-    if !isdir("grafiken/Sekundärregelleistung/$i/tages_werte")
-        # Create the directory
-        mkdir("grafiken/Sekundärregelleistung/$i/tages_werte")
+    for i in regions
+        if !isdir("grafiken/$leistungsart/$i")
+            # Create the directory
+            mkdir("grafiken/$leistungsart/$i")
+        end
     end
 end
 
@@ -31,7 +33,7 @@ for y in years
             positive_power = df[!, "max_power_$region"]
             negative_power = df[!, "min_power_$region"]
             power = positive_power .- negative_power
-
+            Sekundärregelleistung
             fig = Figure()
             ax_1 = Axis(fig[1, 1])
             ax_1.ylabel = "Leistung in MW"
@@ -66,6 +68,59 @@ for region in regions
 
         fig, ax_1 = data_vis_year(dates, power, fig, 1, 1, ax_1, y)
         save("grafiken/Sekundärregelleistung/$region/durchschnittliche tagesleistung $region-$y.svg", fig)
+    end
+end
+
+
+queuery = "SELECT * FROM Windproduktion"
+wind_df = load_db_data(queuery)
+queuery = "SELECT * FROM Solarproduktion"
+solar_df = load_db_data(queuery)
+
+solar_avg = average_over_week(solar_df)
+wind_avg = average_over_week(wind_df)
+
+wind
+
+for leistungsart in leistungsarten
+    for region in regions
+        fig = Figure(size=(1920, 1080))
+        ax_1 = Axis(fig[1, 1])
+        ax_1.ylabel = "Leistung in MW"
+        ax_1.xlabel = "Datum"
+        ax_1.title = "durchschnittliche $leistungsart $region"
+        queuery = "SELECT * FROM $leistungsart"
+        df = load_db_data(queuery)
+        df[!, "power_$region"] = df[!, "max_power_$region"] .- df[!, "min_power_$region"]
+        select!(df, ["date", "min_power_$region", "max_power_$region", "power_$region"])
+
+        df_avg = average_over_week(df)
+        dates_avg = df_avg[!, "date"]
+        power_avg = df_avg[!, Symbol("power_$region", "_sum")]
+        power_avg_min = df_avg[!, Symbol("min_power_$region", "_sum")] .* -1
+        power_avg_max = df_avg[!, Symbol("max_power_$region", "_sum")]
+
+        df_min = min_over_week(df)
+        dates_min = df_min[!, "date"]
+        power_min = df_min[!, Symbol("power_$region", "_min")]
+
+        df_max = max_over_week(df)
+        dates_max = df_max[!, "date"]
+        power_max = df_max[!, Symbol("power_$region", "_sum")]
+
+        df_std = std_over_week(df)
+        dates_std = df_std[!, "date"]
+        power_std = df_std[!, Symbol("power_$region", "_sum")]
+
+        fig, ax_1 = data_vis_year(dates_avg, power_avg, fig, 1, 1, ax_1, "Average")
+        fig, ax_1 = data_vis_year(dates_avg, power_avg_min, fig, 1, 1, ax_1, "Negiative Power Average")
+        fig, ax_1 = data_vis_year(dates_avg, power_avg_max, fig, 1, 1, ax_1, "Positive Power Average")
+        fig, ax_1 = data_vis_year(dates_std, power_avg .+ power_std, fig, 1, 1, ax_1, "Standard deviation")
+        fig, ax_1 = data_vis_year(dates_std, power_avg .- power_std, fig, 1, 1, ax_1, "Standard deviation")
+        fig, ax_1 = data_vis_year(dates_min, power_min, fig, 1, 1, ax_1, "Minimum")
+        fig, ax_1 = data_vis_year(dates_max, power_max, fig, 1, 1, ax_1, "Maximum")
+        axislegend(position=:lb)
+        save("grafiken/$leistungsart/$region/durchschnittliche Wochenregelleistung $region-2022-2025.svg", fig)
     end
 end
 
