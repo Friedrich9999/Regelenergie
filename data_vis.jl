@@ -14,12 +14,11 @@ function data_vis_histogramm(date, time, max_power, min_power, fig, ax_x, ax_y)
     print(dt)
 end
 
-function data_vis_heatmap(x, y, max_power, min_power, fig, row, col)
+function data_vis_heatmap(x, y, power, fig, row, col)
 
     nr_of_rows = 24 * 4 # one row for each datapoint per day
 
-    pos_lin = max_power .- min_power
-    pos = reshape(pos_lin, nr_of_rows, :)
+    pos = reshape(power, nr_of_rows, :)
 
     ax_1 = Axis(fig[row, col])
     ax_1.title = "Heatmap"

@@ -77,13 +77,40 @@ wind_df = load_db_data(queuery)
 queuery = "SELECT * FROM Solarproduktion"
 solar_df = load_db_data(queuery)
 
-solar_avg = average_over_week(solar_df)
-wind_avg = average_over_week(wind_df)
+sqlkeys = ["Windproduktion", "Solarproduktion"]
 
-wind
+for key in sqlkeys
+    if !isdir("grafiken/$key")
+        # Create the directory
+        mkdir("grafiken/$key")
+    end
+    queuery = "SELECT * FROM $key"
+    df = load_db_data(queuery)
+    for region in regions
+        if region == "deutschland"
+            continue
+        end
+        ##Heatmap
+        fig = Figure()
+        dt = df[!, "date"]
+        time = Time.(dt)
+        date = Date.(dt)
+        power = df[!, "leistung$region"]
+        fig = data_vis_heatmap(date, time, power, fig, 1, 1)
+        save("grafiken/$key/Heatmap_$region.png", fig)
+    end
+end
 
 for leistungsart in leistungsarten
     for region in regions
+        if region == "deutschland"
+            continue
+        end
+        dates_wind = wind_avg[!, "date"]
+        leistung_wind = wind_avg[!, Symbol("leistung$region", "_sum")]
+        leistung_solar = solar_avg[!, Symbol("leistung$region", "_sum")]
+        leistung_renewable = leistung_wind .+ leistung_solar
+
         fig = Figure(size=(1920, 1080))
         ax_1 = Axis(fig[1, 1])
         ax_1.ylabel = "Leistung in MW"
@@ -119,6 +146,16 @@ for leistungsart in leistungsarten
         fig, ax_1 = data_vis_year(dates_std, power_avg .- power_std, fig, 1, 1, ax_1, "Standard deviation")
         fig, ax_1 = data_vis_year(dates_min, power_min, fig, 1, 1, ax_1, "Minimum")
         fig, ax_1 = data_vis_year(dates_max, power_max, fig, 1, 1, ax_1, "Maximum")
+
+        ax_2 = fig[1, 1] = Axis(fig, ylabel="Leistung Erneuerbare")
+        fig, ax_2 = data_vis_year(dates_wind, leistung_wind, fig, 1, 1, ax_2, "Average Wind")
+        fig, ax_2 = data_vis_year(dates_wind, leistung_solar, fig, 1, 1, ax_2, "Average Solar")
+        fig, ax_2 = data_vis_year(dates_wind, leistung_renewable, fig, 1, 1, ax_2, "Average Renewable")
+        ax_2.yaxisposition = :right
+        #ax2.yticklabelalign = (:left, :center)
+        ax_2.xticklabelsvisible = false
+        #ax2.xticklabelsvisible = false
+        ax_2.xlabelvisible = false
         axislegend(position=:lb)
         save("grafiken/$leistungsart/$region/durchschnittliche Wochenregelleistung $region-2022-2025.svg", fig)
     end
