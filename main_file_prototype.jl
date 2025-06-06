@@ -3,24 +3,12 @@ using CairoMakie
 include("data_vis.jl")
 include("load_from_db.jl")
 include("modify_data.jl")
+include("components.jl")
 
 years = ["2022", "2023", "2024", "2025"]
 days = ["01-01", "04-01", "06-01", "10-01"]
 regions = ["50hz", "amprion", "tennet", "transnetBW", "deutschland"]
 leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
-
-for leistungsart in leistungsarten
-    if !isdir("grafiken/$leistungsart")
-        # Create the directory
-        mkdir("grafiken/$leistungsart")
-    end
-    for i in regions
-        if !isdir("grafiken/$leistungsart/$i")
-            # Create the directory
-            mkdir("grafiken/$leistungsart/$i")
-        end
-    end
-end
 
 # visualisierung der regelleistung an spezifischen tagen
 
@@ -46,7 +34,7 @@ for y in years
             date = Dates.format(date, "dd.mm.yyyy")
 
             ax_1.title = "Sekundärregelleistung in MW am $date"
-            save("grafiken/Sekundärregelleistung/$region/tages_werte/tages_werte_$region-$y-$d.svg", fig)
+            save_figure("grafiken/Sekundärregelleistung/$region/tages_werte/tages_werte_$region-$y-$d.svg", fig)
         end
     end
 end
@@ -67,7 +55,7 @@ for region in regions
         power = positive_power .- negative_power
 
         fig, ax_1 = data_vis_year(dates, power, fig, 1, 1, ax_1, y)
-        save("grafiken/Sekundärregelleistung/$region/durchschnittliche tagesleistung $region-$y.svg", fig)
+        save_figure("grafiken/Sekundärregelleistung/$region/durchschnittliche tagesleistung $region-$y.svg", fig)
     end
 end
 
@@ -80,10 +68,6 @@ solar_df = load_db_data(queuery)
 sqlkeys = ["Windproduktion", "Solarproduktion"]
 
 for key in sqlkeys
-    if !isdir("grafiken/$key")
-        # Create the directory
-        mkdir("grafiken/$key")
-    end
     queuery = "SELECT * FROM $key"
     df = load_db_data(queuery)
     for region in regions
@@ -97,7 +81,7 @@ for key in sqlkeys
         date = Date.(dt)
         power = df[!, "leistung$region"]
         fig = data_vis_heatmap(date, time, power, fig, 1, 1)
-        save("grafiken/$key/Heatmap_$region.png", fig)
+        save_figure("grafiken/$key/Heatmap_$region.png", fig)
     end
 end
 
@@ -157,7 +141,7 @@ for leistungsart in leistungsarten
         #ax2.xticklabelsvisible = false
         ax_2.xlabelvisible = false
         axislegend(position=:lb)
-        save("grafiken/$leistungsart/$region/durchschnittliche Wochenregelleistung $region-2022-2025.svg", fig)
+        save_figure("grafiken/$leistungsart/$region/durchschnittliche Wochenregelleistung $region-2022-2025.svg", fig)
     end
 end
 
@@ -176,23 +160,11 @@ for region in regions
     power = positive_power .- negative_power
 
     fig, ax_1 = data_vis_year(dates, power, fig, 1, 1, ax_1, "regelleistung")
-    save("grafiken/Sekundärregelleistung/$region/durchschnittliche tagesleistung $region-2022-2025.svg", fig)
+    save_figure("grafiken/Sekundärregelleistung/$region/durchschnittliche tagesleistung $region-2022-2025.svg", fig)
 end
 
 tables = ["Windproduktion", "Solarproduktion"]
 regions = ["50hz", "amprion", "tennet", "transnetBW"]
-for t in tables
-    if !isdir("grafiken/$t")
-        # Create the directory
-        mkdir("grafiken/$t")
-    end
-    for i in regions
-        if !isdir("grafiken/$t/$i")
-            # Create the directory
-            mkdir("grafiken/$t/$i")
-        end
-    end
-end
 
 for t in tables
     for y in years
@@ -212,7 +184,7 @@ for t in tables
                 date = Dates.format(date, "dd.mm.yyyy")
 
                 ax_1.title = "Leistung in MW am $date"
-                save("grafiken/$t/$region/tages_leistung_$region-$y-$d.svg", fig)
+                save_figure("grafiken/$t/$region/tages_leistung_$region-$y-$d.svg", fig)
             end
         end
     end
@@ -243,7 +215,7 @@ for t in tables
             date = Date(DateTime("$y", "yyyy-mm-dd"))
             date = Dates.format(date, "dd.mm.yyyy")
             #axislegend()
-            save("grafiken/$t/$region/tages_leistung_summe_$region-$y.svg", fig)
+            save_figure("grafiken/$t/$region/tages_leistung_summe_$region-$y.svg", fig)
         end
     end
 end
@@ -263,6 +235,6 @@ for t in tables
         ax_1.ylabel = "Leistung in MW"
         ax_1.xlabel = "Datum"
         ax_1.title = "Leistung in MW 2022 - 2025"
-        save("grafiken/$t/$region/tages_leistung_summe_$region-2022-2025.svg", fig)
+        save_figure("grafiken/$t/$region/tages_leistung_summe_$region-2022-2025.svg", fig)
     end
 end
