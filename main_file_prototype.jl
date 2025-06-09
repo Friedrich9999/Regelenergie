@@ -1,40 +1,52 @@
 using CairoMakie
 
 include("data_vis.jl")
-include("load_from_db.jl")
 include("modify_data.jl")
 include("components.jl")
+include("load_from_db.jl")
+
 
 years = ["2022", "2023", "2024", "2025"]
 days = ["01-01", "04-01", "06-01", "10-01"]
-regions = ["50hz", "amprion", "tennet", "transnetBW", "deutschland"]
+regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
 leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
 
 # visualisierung der regelleistung an spezifischen tagen
 
+
 for y in years
     for d in days
-        queuery = "SELECT * FROM Sekundärregelleistung WHERE date LIKE '%$y-$d%'"#
-        df = load_db_data(queuery)
         for region in regions
-            dates = df[!, "date"]
-            positive_power = df[!, "max_power_$region"]
-            negative_power = df[!, "min_power_$region"]
-            power = positive_power .- negative_power
-            Sekundärregelleistung
-            fig = Figure()
-            ax_1 = Axis(fig[1, 1])
-            ax_1.ylabel = "Leistung in MW"
-            ax_1.xlabel = "Tageszeit"
+            for leistungsart in leistungsarten
+                # get the date in dd.mm.yyyy format from yyyy-mm-dd format
+                date = get_date_format("$y-$d")
 
-            fig, ax_1 = data_vis_day(dates, power, fig, 1, 1, ax_1)
+                # get your data
+                df = get_day(region, "$leistungsart, Windleistung, Solarleistung", "$y-$d")
+                dates = df[!, "date"]
+                power = df[!, "$leistungsart"]
+                power_wind = df[!, "Windleistung"]
+                power_solar = df[!, "Solarleistung"]
 
-            date = "$y-$d"
-            date = Date(DateTime("$y-$d", "yyyy-mm-dd"))
-            date = Dates.format(date, "dd.mm.yyyy")
+                # skip is there is no data at the date
+                if typeof(power) == Vector{Missing}
+                    continue
+                end
 
-            ax_1.title = "Sekundärregelleistung in MW am $date"
-            save_figure("grafiken/Sekundärregelleistung/$region/tages_werte/tages_werte_$region-$y-$d.svg", fig)
+                # kreiere die figur
+                fig = Figure()
+                ax_1 = Axis(fig[1, 1])
+                ax_1.ylabel = "Leistung in MW"
+                ax_1.xlabel = "Tageszeit"
+
+                # zeichne eine kurve
+                fig, ax_1 = data_vis_day(dates, power, fig, 1, 1, ax_1)
+                fig, ax_1 = data_vis_day(dates, power_wind, fig, 1, 1, ax_1)
+                fig, ax_1 = data_vis_day(dates, power_solar, fig, 1, 1, ax_1)
+
+                ax_1.title = "Sekundärregelleistung in MW am $date"
+                save_figure("test/grafiken/Sekundärregelleistung/$region/tages_werte/tages_werte_$region-$y-$d.svg", fig)
+            end
         end
     end
 end
@@ -60,31 +72,31 @@ for region in regions
 end
 
 
-queuery = "SELECT * FROM Windproduktion"
-wind_df = load_db_data(queuery)
-queuery = "SELECT * FROM Solarproduktion"
-solar_df = load_db_data(queuery)
+leistungsarten = ["Windleistung", "Solarleistung", "Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
+for region in regions
+    for leistungsart in leistungsarten
+        # get your data
+        df = get_day(region, leistungsart, "any")
+        dates = df[!, "date"]
+        power = df[!, "$leistungsart"]
 
-sqlkeys = ["Windproduktion", "Solarproduktion"]
+        fig, ax1 = data_vis_heatmap(dates, power)
 
-for key in sqlkeys
-    queuery = "SELECT * FROM $key"
-    df = load_db_data(queuery)
-    for region in regions
-        if region == "deutschland"
-            continue
-        end
-        ##Heatmap
-        fig = Figure()
-        dt = df[!, "date"]
-        time = Time.(dt)
-        date = Date.(dt)
-        power = df[!, "leistung$region"]
-        fig = data_vis_heatmap(date, time, power, fig, 1, 1)
-        save_figure("grafiken/$key/Heatmap_$region.png", fig)
+        ax1.title = "Heatmap $leistungsart $region"
+        ax1.ylabel = "Tageszeit"
+        ax1.xlabel = "Datum"
+        save_figure("grafiken/$region/Heatmap_$leistungsart.png", fig)
+
     end
 end
+# queuery = "SELECT date, Solarleistung FROM [50Hertz]"
+# df = load_db_data(queuery)
+# dt = df[!, "date"]
+# power = df[!, "Solarleistung"]
+# 
+# df
 
+##Heatmap
 for leistungsart in leistungsarten
     for region in regions
         if region == "deutschland"
@@ -220,8 +232,6 @@ for t in tables
     end
 end
 
-
-;
 for t in tables
     queuery = "SELECT * FROM $t"#
     df = load_db_data(queuery)

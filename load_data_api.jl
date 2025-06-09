@@ -53,149 +53,201 @@ data_dict = Dict("Primärregelleistung" => "nrvsaldo/PRL/Qualitaetsgesichert", "
 start_time = "2022-01-01"
 end_time = "2025-12-31"
 product = "Qualitaetsgesichert"
+regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
 
 # Call the Python function from Julia
 # get OAuth 2.0 Token
 token = get_token()
 
-for key in eachindex(data_dict)
-    product = data_dict[key]
-    print("loading data $data, from $start_time until $end_time")
+db = SQLite.DB("regelenergie_daten.db")
+con = DBInterface
 
-    # get response
+
+for key in eachindex(data_dict)
+
+    # get the data from the api
+    product = data_dict[key]
     response = pycall(py"get_data", String, token, product, start_time, end_time)
 
     #create dataframe
     df = CSV.File(IOBuffer(response), delim=';', dateformat="dd.mm.yyyy") |> DataFrame
 
+    ## create datetime object
     time = Array(df[:, 3])
-
     time = parse_time.(time) .+ Array(df[:, 1])
 
-    drop = [:Zeitzone, :von, :bis, :Datenkategorie, :Datentyp, :Einheit]
-    select!(df, Not(drop))
+    # insert date time object
+    df[!, "Datum"] = time
 
-    rename!(df, [:date, :max_power_50hz, :max_power_amprion, :max_power_tennet, :max_power_transnetBW, :max_power_deutschland, :min_power_50hz, :min_power_amprion, :min_power_tennet, :min_power_transnetBW, :min_power_deutschland])
-
-    df[!, "date"] = time
-
-    df
-
-    header = names(df)
-
-    for i in range(2, 11)
-        n = Array(df[:, i])
-        h = header[i]
-        n = parse_comma_float.(n)
-        df[!, header[i]] = n
-    end
-
-    start = 1
-    while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
-        start += 1
-    end
-
-    e = length(time)
-    while Time(time[e]) != Time(DateTime("23:45", "HH:MM"))
-        e -= 1
-    end
-
-    print("genutzte werte von $start bis $e")
-
-    df = df[start:e, :]
-
-    content_string = "date TEXT"
-    for i in header
-        if i != "date"
-            content_string *= ",$i REAL"
-        end
-    end
-
+    # create dates
     dt = Array(df[:, 1])
     dt = Dates.format.(dt, "yyyy-mm-ddTHH:MM:SS")
-    df[!, "date"] = dt
+    df[!, "Datum"] = dt
+
+    for region in regions
+        # get the headers
+        header = names(df)
+        # filter the header
+        filter!((x) -> occursin(region, x) || occursin("Datum", x), header)
+
+        # create data frame subset
+        df_subset = select(df, header)
+        header = names(df_subset)
+        rename!(df_subset, ["date", "positive_$key", "negative_$key"])
+
+        # remove date from header
+        header = names(df_subset)
+        popfirst!(header)
 
 
-    content_string
+        for h in header
+            n = Array(df_subset[!, h])
+            n = parse_comma_float.(n)
+            df_subset[!, h] = n
+        end
 
-    ## Create SQLite Database
-    db = SQLite.DB("netztransparenz.db")
-    con = DBInterface
-    SQLite.execute(db, "CREATE TABLE IF NOT EXISTS $key($content_string)")
-    SQLite.tables(db)
-    SQLite.load!(df, db, "$key")
-    df = DataFrame(con.execute(db, "SELECT * FROM $key"))
+        df_subset[!, key] = Array(df_subset[:, "positive_$key"]) .- Array(df_subset[:, "negative_$key"])
+        df_subset[!, "negative_$key"] = Array(df_subset[:, "negative_$key"]) .* -1
+
+        header = names(df_subset)
+        popfirst!(header)
+
+        start = 1
+        while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
+            start += 1
+        end
+
+        e = length(time)
+        while Time(time[e]) != Time(DateTime("23:45", "HH:MM"))
+            e -= 1
+        end
+
+        df_subset = df_subset[start:e, :]
+
+
+        ## Create SQLite Database
+        SQLite.execute(db, "CREATE TABLE IF NOT EXISTS [$region](date TEXT PRIMARY KEY)")
+
+        for h in header
+            try
+                SQLite.execute(db, "ALTER TABLE [$region] ADD COLUMN $h REAL")
+            catch e
+                print("Altering $region: $(string(e))\n")
+            end
+        end
+
+        SQLite.transaction(db) do
+            for row in eachrow(df_subset)
+                SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
+                SQLite.execute(
+                    db,
+                    "UPDATE [$region] SET $(header[1])='$(row[2])', $(header[2])='$(row[3])', $(header[3])='$(row[4])' WHERE date = '$(row[1])'"
+                )
+            end
+        end
+    end
+    print("finnished writing \n")
 end
 
 
-data_dict = Dict("Windproduktion" => "hochrechnung/Wind", "Solarproduktion" => "hochrechnung/Solar")
-
+data_dict = Dict("Windleistung" => "hochrechnung/Wind", "Solarleistung" => "hochrechnung/Solar")
 for key in eachindex(data_dict)
+    # get the data from the api
     product = data_dict[key]
-    print("loading data $product, from $start_time until $end_time")
-
-    # get response
     response = pycall(py"get_data", String, token, product, start_time, end_time)
 
     #create dataframe
     df = CSV.File(IOBuffer(response), delim=';', dateformat="yyyy-mm-dd") |> DataFrame
 
+    ## create datetime object
     time = Array(df[:, 2])
-
     time = parse_time.(time) .+ Array(df[:, 1])
 
-    drop = [:Zeitzone_von, :von, :bis, :Zeitzone_bis]
-    rename!(df, [:date, :von, :Zeitzone_von, :bis, :Zeitzone_bis, :leistung50hz, :leistungamprion, :leistungtennet, :leistungtransnetBW])
-    select!(df, Not(drop))
+    # insert date time object
+    df[!, "Datum"] = time
 
-    df[!, "date"] = time
+    # create dates
+    dt = Array(df[:, 1])
+    dt = Dates.format.(dt, "yyyy-mm-ddTHH:MM:SS")
+    df[!, "Datum"] = dt
 
     df
 
-    df = coalesce.(df, "0,0")
-
     header = names(df)
+    # filter the header
+    filter!((x) -> occursin("MW", x) || occursin("Datum", x), header)
 
-    for i in range(2, 5)
-        n = Array(df[:, i])
-        h = header[i]
+    # create data frame subset
+    df = select(df, header)
+
+
+    # remove date from header
+    header = names(df)
+    popfirst!(header)
+
+    for h in header
+        n = Array(df[!, h])
         n = parse_comma_float.(n)
-        df[!, header[i]] = n
+        df[!, h] = n
     end
 
-    start = 1
-    while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
-        start += 1
-    end
+    df
 
-    e = length(time)
-    while Time(time[e]) != Time(DateTime("23:45", "HH:MM"))
-        e -= 1
-    end
 
-    print("genutzte werte von $start bis $e")
+    for region in regions
+        # get the headers
+        header = names(df)
+        # filter the header
+        filter!((x) -> occursin(region, x) || occursin("Datum", x), header)
 
-    df = df[start:e, :]
+        # create data frame subset
+        df_subset = select(df, header)
 
-    content_string = "date TEXT"
-    for i in header
-        if i != "date"
-            content_string *= ",$i REAL"
+        df_subset
+
+        if region == "Deutschland"
+            df_subset[!, "Windleistung"] = Array(df[:, 2]) .+ Array(df[:, 3]) .+ Array(df[:, 4]) .+ Array(df[:, 5])
+        end
+        df_subset
+        rename!(df_subset, ["date", "$key"])
+
+        start = 1
+        while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
+            start += 1
+        end
+
+        e = length(time)
+        while Time(time[e]) != Time(DateTime("23:45", "HH:MM"))
+            e -= 1
+        end
+
+        df_subset = df_subset[start:e, :]
+
+
+        ## Create SQLite Database
+        SQLite.execute(db, "CREATE TABLE IF NOT EXISTS [$region](date TEXT PRIMARY KEY)")
+
+        header = names(df_subset)
+        popfirst!(header)
+
+        header
+        for h in header
+            try
+                SQLite.execute(db, "ALTER TABLE [$region] ADD COLUMN $h REAL")
+            catch e
+                print("Altering $region: $(string(e))\n")
+            end
+        end
+
+        SQLite.transaction(db) do
+            for row in eachrow(df_subset)
+                SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
+                SQLite.execute(
+                    db,
+                    "UPDATE [$region] SET $(header[1])='$(row[2])' WHERE date = '$(row[1])'"
+                )
+            end
         end
     end
 
-    dt = Array(df[:, 1])
-    dt = Dates.format.(dt, "yyyy-mm-ddTHH:MM:SS")
-    df[!, "date"] = dt
-
-
-    content_string
-
-    ## Create SQLite Database
-    db = SQLite.DB("netztransparenz.db")
-    con = DBInterface
-    SQLite.execute(db, "CREATE TABLE IF NOT EXISTS $key($content_string)")
-    SQLite.tables(db)
-    SQLite.load!(df, db, "$key")
-    df = DataFrame(con.execute(db, "SELECT * FROM $key"))
 end

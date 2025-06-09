@@ -9,10 +9,14 @@ function get_date_from_String(s::AbstractString)
 end
 
 # load from data base
-db = SQLite.DB("netztransparenz.db")
+db = SQLite.DB("regelenergie_daten.db")
 con = DBInterface
 
 function load_db_data(queuery::String)
+
+    queuery *= " ORDER BY date ASC"
+
+    print("$queuery\n\n\n\n")
 
     df = DataFrame(con.execute(db, queuery))
 
