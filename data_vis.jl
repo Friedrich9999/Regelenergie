@@ -16,9 +16,9 @@ function data_vis_histogramm(date, time, max_power, min_power, fig, ax_x, ax_y)
     print(dt)
 end
 
-function data_vis_heatmap(dates, power)
+function data_vis_heatmap(dates, power, colormap=:seismic)
 
-    fig = Figure()
+    fig = Figure(size=(1500, 600))
 
     nr_of_rows = 24 * 4 # one row for each datapoint per day
 
@@ -34,7 +34,7 @@ function data_vis_heatmap(dates, power)
     day_one = Date(dates[1])
     # print("$day_one, ")
     for i in range(1, size(pos)[2])
-        if Day(day_one + Day(i)) == Day(1) && Month(day_one + Day(i)) in [Month(6), Month(12)]
+        if Day(day_one + Day(i)) == Day(1) && Month(day_one + Day(i)) in [Month(3), Month(6), Month(9), Month(12)]
             push!(xticks, i)
             push!(xlabels, Dates.format.(day_one + Day(i), "mm.yyyy"))
             # print("$(Dates.format.(day_one + Day(i), "mm.yyyy")), ")
@@ -47,7 +47,7 @@ function data_vis_heatmap(dates, power)
     ax_1.title = "Heatmap"
     ax_1.ylabel = "Tageszeit"
     ax_1.xlabel = "Tag"
-    hmap = heatmap!(ax_1, pos', colormap=:seismic, colorrange=(-1, 1) .* maximum(abs, pos))
+    hmap = heatmap!(ax_1, pos', colormap=colormap, colorrange=(-1, 1) .* maximum(abs, pos))
     ax_1.yticks = (yticks, ylabels)
     ax_1.xticks = (xticks, xlabels)
     Colorbar(fig[1, 2], hmap; label="Leistung in MW", width=15, ticksize=15, tickalign=1)
