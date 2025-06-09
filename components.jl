@@ -15,9 +15,16 @@ function save_figure(path::String, fig::Figure)
 end
 
 function get_day(region::String, datensatz::String, date::String)
-    queuery = date == "any" ? "SELECT date, $datensatz FROM [$region] WHERE $datensatz IS NOT NULL" : "SELECT date, $datensatz FROM [$region] WHERE date LIKE '%$date%' AND $datensatz IS NOT NULL"
+    # queuery = ""
+    # if date == "any"
+    #     queuery = "SELECT date, $datensatz FROM [$region] WHERE $datensatz IS NOT NULL" 
+    # elseif date == Array{String}
+    #     BETWEEN '2014-10-09 00:00:00' AND '2014-10-10 23:59:59'
+    # 
+    # else
+    # end
 
-    print("$queuery\n\n\n\n")
+    queuery = date == "any" ? "SELECT date, $datensatz FROM [$region] WHERE $datensatz IS NOT NULL" : "SELECT date, $datensatz FROM [$region] WHERE date LIKE '%$date%'"
 
     return load_db_data(queuery)
 

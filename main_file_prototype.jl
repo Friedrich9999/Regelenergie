@@ -13,12 +13,13 @@ leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärreg
 
 # visualisierung der regelleistung an spezifischen tagen
 
+df = get_day("50Hertz", "Primärregelleistung, Windleistung, Solarleistung", "2022-01-01")
 
 for y in years
     for d in days
         for region in regions
             for leistungsart in leistungsarten
-                # get the date in dd.mm.yyyy format from yyyy-mm-dd format
+                # get the date in dd.mm.yyyy format from yyyy-mm-dd format 2022-
                 date = get_date_format("$y-$d")
 
                 # get your data
