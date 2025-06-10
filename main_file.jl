@@ -94,14 +94,14 @@ df = get_day("Deutschland", "Sekundärregelleistung", "any")
 dates = df[!, "date"]
 power = df[!, "Sekundärregelleistung"]
 
-fig, ax1 = data_vis_heatmap(dates, power, :RdBu_11)
+fig, ax1 = data_vis_heatmap(dates, power)
 
 fig
 
-ax1.title = "Heatmap $leistungsart $region"
+ax1.title = "Heatmap Sekundärregelleistung Deutschland"
 ax1.ylabel = "Tageszeit"
 ax1.xlabel = "Datum"
-save_figure("test/grafiken/$region/Heatmap_$leistungsart.png", fig)
+save_figure("test/grafiken/Deutschland/Heatmap_Sekundärregelleistung_Seismic.svg", fig)
 # queuery = "SELECT date, Solarleistung FROM [50Hertz]"
 # df = load_db_data(queuery)
 # dt = df[!, "date"]

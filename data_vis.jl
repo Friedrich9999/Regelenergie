@@ -47,7 +47,7 @@ function data_vis_heatmap(dates, power, colormap=:seismic)
     ax_1.title = "Heatmap"
     ax_1.ylabel = "Tageszeit"
     ax_1.xlabel = "Tag"
-    hmap = heatmap!(ax_1, pos', colormap=colormap, colorrange=(-1, 1) .* maximum(abs, pos))
+    hmap = heatmap!(ax_1, pos', colormap=colormap, colorrange=(-1, 1) .* (maximum(abs, pos)))
     ax_1.yticks = (yticks, ylabels)
     ax_1.xticks = (xticks, xlabels)
     Colorbar(fig[1, 2], hmap; label="Leistung in MW", width=15, ticksize=15, tickalign=1)
