@@ -1,4 +1,5 @@
 import CairoMakie
+import Dates
 include("load_from_db.jl")
 
 function save_figure(path::String, fig::Figure)
@@ -36,4 +37,18 @@ end
 function get_date_format(date::String)
     date = Date(DateTime(date, "yyyy-mm-dd"))
     date = Dates.format(date, "dd.mm.yyyy")
+end
+
+function get_matrix_heat(dates, power)
+
+
+    nr_of_rows = 24 * 4 # one row for each datapoint per day
+    pos = reshape(power, nr_of_rows, :)
+
+    d = Set(datepart for datepart in Dates.Date.(DateTime.(dates)))
+    t = Set(datepart for datepart in Dates.Time.(DateTime.(dates)))
+
+    comb = Dict("dates" => d, "times" => t, "data" => pos)
+
+    return comb
 end

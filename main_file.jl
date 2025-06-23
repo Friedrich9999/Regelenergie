@@ -1,4 +1,5 @@
 using CairoMakie
+using JSON
 
 include("data_vis.jl")
 include("modify_data.jl")
@@ -13,6 +14,18 @@ leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärreg
 
 # visualisierung der regelleistung an spezifischen tagen
 
+df = load_db_data("SELECT date, Primärregelleistung From [50Hertz] WHERE date BETWEEN '2023-01-01' AND '2025-01-01'")
+dates = df[!, "date"]
+power = df[!, "Primärregelleistung"]
+comb = get_matrix_heat(dates, power)
+
+data = comb["data"]
+date = comb["dates"]
+time = comb["times"]
+
+col = collect(eachrow(data))
+dict = Dict("xAxis" => date, "yAxis" => time, "data" => col)
+json_array = JSON.json(dict)
 
 for y in years
     for d in days
