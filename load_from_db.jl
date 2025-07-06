@@ -27,3 +27,17 @@ function load_db_data(queuery::String)
     df[!, "date"] = dt
     return df
 end
+
+function load_db_data_no_mod(queuery::String)
+
+    print("$queuery\n\n")
+
+    df = DataFrame(con.execute(db, queuery))
+
+    # get date in DateTime format
+    dt = Array(df[:, 1])
+
+    dt = get_date_from_String.(dt)
+    df[!, "date"] = dt
+    return df
+end

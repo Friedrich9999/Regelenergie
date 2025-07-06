@@ -15,6 +15,29 @@ days = ["01-01", "04-01", "06-01", "10-01"]
 regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
 leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
 
+qs_selection = ""
+for r in regions
+    for t in leistungsarten
+        qs *= """[$r].$t AS "$t $r", """
+    end
+end
+qs = chop(chop(qs))
+
+qs *= " "
+
+qs_join = ""
+for r in regions
+    if r == "Deutschland"
+        continue
+    end
+    qs_join *= "INNER JOIN [$r] ON [$r].date = Deutschland.date "
+end
+
+query = """ SELECT [Deutschland].date AS "Datum", $qs FROM Deutschland $qs_join WHERE [Deutschland].date BETWEEN '2023-01-01' AND '2025-01-01' ORDER BY [Deutschland].date ASC"""
+
+df = load_db_data_no_mod(query)
+
+
 # visualisierung der regelleistung an spezifischen tagen
 
 df = load_db_data("SELECT date, Primärregelleistung From [50Hertz] WHERE date BETWEEN '2023-01-01' AND '2025-01-01'")
