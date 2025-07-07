@@ -2,6 +2,7 @@ using CairoMakie
 using JSON
 using Dates
 using DataFrames
+using CurveFit
 
 
 include("data_vis.jl")
@@ -14,16 +15,16 @@ years = ["2022", "2023", "2024", "2025"]
 days = ["01-01", "04-01", "06-01", "10-01"]
 regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
 leistungsarten = ["Primärregelleistung", "Sekundärregelleistung", "Tertiärregelleistung"]
+regenerative = ["Solarleistung", "Windleistung"]
+months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
 qs_selection = ""
 for r in regions
     for t in leistungsarten
-        qs *= """[$r].$t AS "$t $r", """
+        qs_selection *= """[$r].$t AS "$t $r", """
     end
 end
-qs = chop(chop(qs))
-
-qs *= " "
+qs_selection = chop(chop(qs))
 
 qs_join = ""
 for r in regions
@@ -95,6 +96,102 @@ for y in years
 
                 ax_1.title = "Sekundärregelleistung in MW am $date"
                 save_figure("test/grafiken/Sekundärregelleistung/$region/tages_werte/tages_werte_$region-$y-$d.svg", fig)
+            end
+        end
+    end
+end
+
+
+leistungsart = "Primärregelleistung"
+e = "Solarleistung"
+y = "2025"
+# kreiere die figur
+fig = Figure()
+ax_1 = Axis(fig[1, 1])
+ax_1.ylabel = "$leistungsart in MW"
+ax_1.xlabel = "$e in MW"
+ax_1.title = "Sekundärregelleistung in MW am $y"
+
+# get your data
+df = load_db_data_no_mod("""SELECT date, Primärregelleistung, Solarleistung FROM [50Hertz] WHERE date LIKE '%2025-07%' ORDER BY date ASC""")
+
+if size(df)[1] == 0
+    continue
+end
+
+power = df[!, "$leistungsart"]
+
+# skip is there is no data at the date
+if typeof(power) == Vector{Missing}
+    continue
+end
+
+df = filter("$e" => n -> n != 0, df)
+df = filter("$leistungsart" => n -> typeof(n) != Missing, df)
+df = filter("$e" => n -> typeof(n) != Missing, df)
+
+power = convert(Vector{Float64}, df[!, "$leistungsart"])
+reg = convert(Vector{Float64}, df[!, "$e"])
+
+a = poly_fit(reg, power, 3)
+x_st = LinRange(minimum(reg), maximum(reg), 1000)
+y_st = a[1] .+ a[2] .* x_st .+ a[3] .* x_st .+ a[4] .* x_st
+print(a)
+
+print(size(power))
+print(size(reg))
+
+scatter!(ax_1, reg, power, alpha=0.2, markersize=3)
+lines!(ax_1, x_st, y_st)
+
+save_figure("test/grafiken/custom x/$e/$leistungsart/$region/Custom X $y.svg", fig)
+
+for region in regions
+    for leistungsart in leistungsarten
+        for y in years
+            for e in regenerative
+
+                # kreiere die figur
+                fig = Figure()
+                ax_1 = Axis(fig[1, 1])
+                ax_1.ylabel = "$leistungsart in MW"
+                ax_1.xlabel = "$e in MW"
+                ax_1.title = "Sekundärregelleistung in MW am $y"
+
+                for m in months
+                    # get your data
+                    df = get_day(region, "$leistungsart, $e", "$y-$m")
+
+                    if size(df)[1] == 0
+                        continue
+                    end
+
+                    power = df[!, "$leistungsart"]
+
+                    # skip is there is no data at the date
+                    if typeof(power) == Vector{Missing}
+                        continue
+                    end
+
+                    df = filter("$e" => n -> n != 0, df)
+                    df = filter("$leistungsart" => n -> typeof(n) != Missing, df)
+                    df = filter("$e" => n -> typeof(n) != Missing, df)
+
+                    power = convert(Vector{Float64}, df[!, "$leistungsart"])
+                    reg = convert(Vector{Float64}, df[!, "$e"])
+
+                    a = curve_fit(Polynomial, reg, power, 2)
+                    x_st = LinRange(minimum(reg), maximum(reg), 1000)
+                    y_st = a[1] .+ a[2] .* x_st .+ a[3] .* x_st
+                    print(a)
+
+                    print(size(power))
+                    print(size(reg))
+
+                    scatter!(ax_1, reg, power, alpha=0.2, markersize=3)
+                    lines!(ax_1, x_st, y_st)
+                end
+                save_figure("test/grafiken/custom x/$e/$leistungsart/$region/Custom X $y.svg", fig)
             end
         end
     end

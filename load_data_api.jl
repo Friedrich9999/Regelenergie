@@ -50,7 +50,7 @@ end
 
 
 data_dict = Dict("Primärregelleistung" => "nrvsaldo/PRL/Qualitaetsgesichert", "Sekundärregelleistung" => "nrvsaldo/AktivierteSRL/Qualitaetsgesichert", "Tertiärregelleistung" => "nrvsaldo/AktivierteMRL/Qualitaetsgesichert")
-start_time = "2022-01-01"
+start_time = "2014-01-01"
 end_time = "2025-12-31"
 product = "Qualitaetsgesichert"
 regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
@@ -95,23 +95,6 @@ for key in eachindex(data_dict)
         header = names(df_subset)
         rename!(df_subset, ["date", "positive_$key", "negative_$key"])
 
-        # remove date from header
-        header = names(df_subset)
-        popfirst!(header)
-
-
-        for h in header
-            n = Array(df_subset[!, h])
-            n = parse_comma_float.(n)
-            df_subset[!, h] = n
-        end
-
-        df_subset[!, key] = Array(df_subset[:, "positive_$key"]) .- Array(df_subset[:, "negative_$key"])
-        df_subset[!, "negative_$key"] = Array(df_subset[:, "negative_$key"]) .* -1
-
-        header = names(df_subset)
-        popfirst!(header)
-
         start = 1
         while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
             start += 1
@@ -125,6 +108,25 @@ for key in eachindex(data_dict)
         df_subset = df_subset[start:e, :]
 
 
+        df_missing = filter("positive_$key" => n -> n == "N.A." || typeof(n) == Missing, df_subset)
+        df_non_missing = filter("positive_$key" => n -> n != "N.A." && typeof(n) != Missing, df_subset)
+
+        # remove date from header
+        header = names(df_subset)
+        popfirst!(header)
+
+        for h in header
+            n = Array(df_non_missing[!, h])
+            n = parse_comma_float.(n)
+            df_non_missing[!, h] = n
+        end
+
+        df_non_missing[!, key] = Array(df_non_missing[:, "positive_$key"]) .- Array(df_non_missing[:, "negative_$key"])
+        df_non_missing[!, "negative_$key"] = Array(df_non_missing[:, "negative_$key"]) .* -1
+
+        header = names(df_non_missing)
+        popfirst!(header)
+
         ## Create SQLite Database
         SQLite.execute(db, "CREATE TABLE IF NOT EXISTS [$region](date TEXT PRIMARY KEY)")
 
@@ -137,11 +139,28 @@ for key in eachindex(data_dict)
         end
 
         SQLite.transaction(db) do
-            for row in eachrow(df_subset)
+            for row in eachrow(df_non_missing)
                 SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
                 SQLite.execute(
                     db,
                     "UPDATE [$region] SET $(header[1])='$(row[2])', $(header[2])='$(row[3])', $(header[3])='$(row[4])' WHERE date = '$(row[1])'"
+                )
+            end
+        end
+        for h in header
+            try
+                SQLite.execute(db, "ALTER TABLE [$region] ADD COLUMN Info TEXT")
+            catch e
+                print("Altering $region: $(string(e))\n")
+            end
+        end
+
+        SQLite.transaction(db) do
+            for row in eachrow(df_missing)
+                SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
+                query = "UPDATE [$region] SET Info = CASE WHEN Info IS NULL THEN '$key' ELSE Info || '$key' END WHERE date = '$(row[1])'"
+                SQLite.execute(
+                    db, query
                 )
             end
         end
@@ -241,10 +260,11 @@ for key in eachindex(data_dict)
 
         SQLite.transaction(db) do
             for row in eachrow(df_subset)
+                val = row[2] < 0 ? 0 : row[2]
                 SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
                 SQLite.execute(
                     db,
-                    "UPDATE [$region] SET $(header[1])='$(row[2])' WHERE date = '$(row[1])'"
+                    "UPDATE [$region] SET $(header[1])='$(val)' WHERE date = '$(row[1])'"
                 )
             end
         end
