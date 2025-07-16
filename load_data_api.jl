@@ -3,6 +3,7 @@ using DataFrames
 using Dates
 using CSV
 using SQLite
+using JSON
 
 ## Define python Script
 py"""
@@ -40,6 +41,12 @@ function parse_comma_float(s)
     return s == "N.A." ? 0.0 : parse(Float64, replace(s, "," => "."))
 end
 
+function add_string_floats(positive_float, negative_float)
+    positive_float = positive_float == "N.A." ? missing : replace(positive_float, "," => ".")
+    negative_float = negative_float == "N.A." ? missing : replace(negative_float, "," => ".")
+    return positive_float - negative_float
+end
+
 function parse_time(s::AbstractString)
     return Time(DateTime(s, "HH:MM"))
 end
@@ -48,12 +55,17 @@ function get_token()
     return pycall(py"get_token", String)
 end
 
+file_path = "config.json"
 
-data_dict = Dict("Primärregelleistung" => "nrvsaldo/PRL/Qualitaetsgesichert", "Sekundärregelleistung" => "nrvsaldo/AktivierteSRL/Qualitaetsgesichert", "Tertiärregelleistung" => "nrvsaldo/AktivierteMRL/Qualitaetsgesichert")
-start_time = "2022-01-01"
-end_time = "2025-12-31"
-product = "Qualitaetsgesichert"
-regions = ["50Hertz", "Amprion", "TenneT TSO", "TransnetBW", "Deutschland"]
+open(file_path, "r") do f
+    global config_data
+    config_data = JSON.parse(f)
+end
+
+regelleistung = config_data["regelleistung"]
+start_date = config_data["start_date"]
+end_date = config_data["end_date"]
+regions = config_data["regions"]
 
 # Call the Python function from Julia
 # get OAuth 2.0 Token
@@ -62,18 +74,22 @@ token = get_token()
 db = SQLite.DB("regelenergie_daten.db")
 con = DBInterface
 
-
-for key in eachindex(data_dict)
+for key in eachindex(regelleistung)
 
     # get the data from the api
-    product = data_dict[key]
-    response = pycall(py"get_data", String, token, product, start_time, end_time)
+    product = regelleistung[key]
+    response = pycall(py"get_data", String, token, product, start_date, end_date)
 
     #create dataframe
     df = CSV.File(IOBuffer(response), delim=';', dateformat="dd.mm.yyyy") |> DataFrame
 
     ## create datetime object
-    time = Array(df[:, 3])
+    try
+        time = Array(df[:, 3])
+    catch e
+        println("there was an error with the dataframe $e")
+        println(df)
+    end
     time = parse_time.(time) .+ Array(df[:, 1])
 
     # insert date time object
@@ -95,23 +111,6 @@ for key in eachindex(data_dict)
         header = names(df_subset)
         rename!(df_subset, ["date", "positive_$key", "negative_$key"])
 
-        # remove date from header
-        header = names(df_subset)
-        popfirst!(header)
-
-
-        for h in header
-            n = Array(df_subset[!, h])
-            n = parse_comma_float.(n)
-            df_subset[!, h] = n
-        end
-
-        df_subset[!, key] = Array(df_subset[:, "positive_$key"]) .- Array(df_subset[:, "negative_$key"])
-        df_subset[!, "negative_$key"] = Array(df_subset[:, "negative_$key"]) .* -1
-
-        header = names(df_subset)
-        popfirst!(header)
-
         start = 1
         while Time(time[start]) != Time(DateTime("00:00", "HH:MM"))
             start += 1
@@ -123,26 +122,36 @@ for key in eachindex(data_dict)
         end
 
         df_subset = df_subset[start:e, :]
+        # remove date from header
+        header = names(df_subset)
+        popfirst!(header)
 
+        df_subset[!, key] = add_string_floats.(Array(df_subset[:, "positive_$key"]), Array(df_subset[:, "negative_$key"]))
+        df_subset = select(df_subset, ["date", key])
+
+        header = names(df_subset)
+        popfirst!(header)
 
         ## Create SQLite Database
         SQLite.execute(db, "CREATE TABLE IF NOT EXISTS [$region](date TEXT PRIMARY KEY)")
 
-        for h in header
-            try
-                SQLite.execute(db, "ALTER TABLE [$region] ADD COLUMN $h REAL")
-            catch e
-                print("Altering $region: $(string(e))\n")
-            end
+        try
+            SQLite.execute(db, "ALTER TABLE [$region] ADD COLUMN $key REAL")
+        catch e
+            print("Altering $region: $(string(e))\n")
         end
 
         SQLite.transaction(db) do
             for row in eachrow(df_subset)
-                SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
-                SQLite.execute(
-                    db,
-                    "UPDATE [$region] SET $(header[1])='$(row[2])', $(header[2])='$(row[3])', $(header[3])='$(row[4])' WHERE date = '$(row[1])'"
-                )
+                SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row["date"])');</")
+                if typeof(row[2]) == Missing
+                    continue
+                else
+                    SQLite.execute(
+                        db,
+                        "UPDATE [$region] SET $(key)='$(row[key])' WHERE date = '$(row["date"])'"
+                    )
+                end
             end
         end
     end
@@ -150,11 +159,11 @@ for key in eachindex(data_dict)
 end
 
 
-data_dict = Dict("Windleistung" => "hochrechnung/Wind", "Solarleistung" => "hochrechnung/Solar")
-for key in eachindex(data_dict)
+renewable_power = config_data["renewable_power"]
+for key in eachindex(renewable_power)
     # get the data from the api
-    product = data_dict[key]
-    response = pycall(py"get_data", String, token, product, start_time, end_time)
+    product = renewable_power[key]
+    response = pycall(py"get_data", String, token, product, start_date, end_date)
 
     #create dataframe
     df = CSV.File(IOBuffer(response), delim=';', dateformat="yyyy-mm-dd") |> DataFrame
@@ -241,10 +250,11 @@ for key in eachindex(data_dict)
 
         SQLite.transaction(db) do
             for row in eachrow(df_subset)
+                val = row[2] < 0 ? 0 : row[2]
                 SQLite.execute(db, "INSERT OR IGNORE INTO [$region] (date) VALUES ('$(row[1])');</")
                 SQLite.execute(
                     db,
-                    "UPDATE [$region] SET $(header[1])='$(row[2])' WHERE date = '$(row[1])'"
+                    "UPDATE [$region] SET $(header[1])='$(val)' WHERE date = '$(row[1])'"
                 )
             end
         end

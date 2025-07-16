@@ -9,10 +9,19 @@ using JSON
 
 import Genie.Renderer.Json: json
 
+open("data_gaps.json", "r") do f
+    global data_gaps
+    data_gaps = JSON.parse(f)
+end
+
+open("config.json", "r") do f
+    global config_data
+    config_data = JSON.parse(f)
+end
 
 #using SolutionsController
 Genie.config.run_as_server = true
-Genie.config.cors_headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
+Genie.config.cors_headers["Access-Control-Allow-Origin"] = config_data["front_end_ip"]
 # This has to be this way - you should not include ".../*"
 Genie.config.cors_headers["Access-Control-Allow-Headers"] = "Content-Type"
 Genie.config.cors_headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
@@ -70,6 +79,10 @@ route("/line", method=POST) do
             "sampling" => "lttb",
             "data" => df[!, h],
             "yAxisIndex" => id,
+            "markArea" => Dict(
+                "itemStyle" => Dict("color" => "rgba(255, 173, 177, 0.4)"),
+                "data" => data_gaps[h]
+                )
         )
         push!(df_arr, obj)
     end
@@ -109,7 +122,7 @@ route("/heatmap", method=POST) do
     max = maximum(abs.(filter(x -> typeof(x) != Missing, power)))
     print("maximum $max")
 
-    dict = Dict("type" => "heatmap", "xAxis" => dates, "yAxis" => times, "data" => col, "min" => -max, "max" => max)
+    dict = Dict("type" => "heatmap","chartName" => occursin("regel", data_types) ? "Abgerufene $data_types in $regions in MW" : "$data_types in $regions in MW", "seriesName" => data_types, "xAxis" => dates, "yAxis" => times, "data" => col, "min" => -max, "max" => max)
 
     return JSON.json(dict)
 end
