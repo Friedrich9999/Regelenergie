@@ -1,0 +1,58 @@
+
+[47210] signal 2: Unterbrechung
+in expression starting at /home/andy/Dokumente/GitHub/Regelenergie/server_starter.jl:135
+epoll_pwait at /lib/x86_64-linux-gnu/libc.so.6 (unknown line)
+uv__io_poll at /workspace/srcdir/libuv/src/unix/linux.c:1404
+uv_run at /workspace/srcdir/libuv/src/unix/core.c:430
+ijl_task_get_next at /cache/build/tester-amdci4-12/julialang/julia-release-1-dot-11/src/scheduler.c:522
+poptask at ./task.jl:1012
+wait at ./task.jl:1021
+#wait#733 at ./condition.jl:130
+wait at ./condition.jl:125 [inlined]
+wait_readnb at ./stream.jl:416
+eof at ./stream.jl:106
+read_to_buffer at /home/andy/.julia/packages/HTTP/MIUdD/src/Connections.jl:223
+readuntil at /home/andy/.julia/packages/HTTP/MIUdD/src/Connections.jl:243
+readuntil at /home/andy/.julia/packages/HTTP/MIUdD/src/Connections.jl:241 [inlined]
+readheaders at /home/andy/.julia/packages/HTTP/MIUdD/src/Messages.jl:533
+startread at /home/andy/.julia/packages/HTTP/MIUdD/src/Streams.jl:153
+handle_connection at /home/andy/.julia/packages/HTTP/MIUdD/src/Servers.jl:445
+#16 at /home/andy/.julia/packages/HTTP/MIUdD/src/Servers.jl:401
+unknown function (ip: 0x707f69f3c44f)
+jl_apply at /cache/build/tester-amdci4-12/julialang/julia-release-1-dot-11/src/julia.h:2157 [inlined]
+start_task at /cache/build/tester-amdci4-12/julialang/julia-release-1-dot-11/src/task.c:1202
+unknown function (ip: (nil))
+Allocations: 31714983 (Pool: 31714270; Big: 713); GC: 20
+  Activating project at `~/Dokumente/GitHub/Regelenergie/regel_energie_venv`
+┌ Info: 
+└ Web Server starting at http://127.0.0.1:8000 - press Ctrl/Cmd+C to stop the server. 
+[ Info: Listening on: 127.0.0.1:8000, thread id: 1
+[ Info: POST /line 200
+val already in a list
+Stacktrace:
+ [1] error(s::String)
+   @ Base ./error.jl:35
+ [2] push!
+   @ ./linked_list.jl:53 [inlined]
+ [3] _wait2(c::Base.GenericCondition{Base.Threads.SpinLock}, waiter::Task, first::Bool)
+   @ Base ./condition.jl:87
+ [4] wait(c::Base.GenericCondition{Base.Threads.SpinLock}; first::Bool)
+   @ Base ./condition.jl:127
+ [5] wait
+   @ ./condition.jl:125 [inlined]
+ [6] close(t::Base.AsyncCondition)
+   @ Base ./asyncevent.jl:183
+ [7] (::Base.var"#1191#1194"{Task, Base.AsyncCondition})()
+   @ Base ./Base.jl:627
+ [8] _atexit(exitcode::Int32)
+   @ Base ./initdefs.jl:451
+┌ Warning: Failed to clean up temporary path "/tmp/jl_genie_build_iwokJw"
+│ ErrorException("schedule: Task not runnable")
+└ @ Base.Filesystem file.jl:571
+Dict{String, Any}("dataTypes" => ["Primärregelleistung"], "startDate" => "2022-01-01", "endDate" => "2025-12-31", "regions" => ["Deutschland"]) SELECT [Deutschland].date , [Deutschland].Primärregelleistung AS "Primärregelleistung Deutschland"  FROM Deutschland  WHERE [Deutschland].date BETWEEN '2022-01-01' AND '2025-12-31' ORDER BY [Deutschland].date ASC
+
+StartDate: 2022-01-01
+EndDate: 2025-12-31
+Regions:["Deutschland"]
+data_types: ["Primärregelleistung"]
+
